@@ -44,7 +44,7 @@ jobs:
       run: |
         echo "Running unit tests..."
         dotnet test --no-build --configuration Release \
-          --filter "Category=Unit" \
+          --filter "FullyQualifiedName~CsvProcessingServiceTests|FullyQualifiedName~MockEmailServiceTests" \
           --logger "console;verbosity=normal" \
           --logger "trx;LogFileName=unit-tests.trx" \
           --collect:"XPlat Code Coverage" \
@@ -107,7 +107,7 @@ jobs:
       run: |
         echo "Running integration tests..."
         dotnet test --no-build --configuration Release \
-          --filter "FullyQualifiedName!~EndToEndEmailProcessingTests&Category=Integration" \
+          --filter "FullyQualifiedName~ApiClientIntegrationTests|FullyQualifiedName~StorageIntegrationTests" \
           --logger "console;verbosity=normal" \
           --logger "trx;LogFileName=integration-tests.trx" \
           --results-directory ./TestResults/Integration
@@ -216,7 +216,7 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Publish
-      run: dotnet publish --no-build --configuration Release --output ./publish
+      run: dotnet publish src/PriceListProcessor/PriceListProcessor.csproj --no-build --configuration Release --output ./publish
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
