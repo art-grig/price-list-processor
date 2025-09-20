@@ -107,6 +107,213 @@ The application uses `appsettings.json` for configuration:
 }
 ```
 
+## Unit Testing
+
+This project includes comprehensive unit and integration tests to ensure code quality and reliability.
+
+### Test Structure
+
+The test suite is organized into several categories:
+
+- **Unit Tests**: Fast, isolated tests for individual components
+- **Integration Tests**: Tests that verify interactions between components
+- **End-to-End Tests**: Full workflow tests that verify the complete system
+
+### Running Tests Locally
+
+#### Prerequisites
+
+1. **Start test infrastructure:**
+   ```bash
+   # Start Redis and MinIO for integration tests
+   docker-compose -f docker-compose.tests.yml up -d
+   ```
+
+2. **Verify services are running:**
+   ```bash
+   # Check Redis
+   docker exec $(docker-compose -f docker-compose.tests.yml ps -q redis) redis-cli ping
+   
+   # Check MinIO
+   curl http://localhost:9000/minio/health/live
+   ```
+
+#### Running All Tests
+
+```bash
+# Run all tests (27 tests total)
+dotnet test
+
+# Run with detailed output
+dotnet test --verbosity normal
+
+# Run with code coverage
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+#### Running Specific Test Categories
+
+```bash
+# Run only unit tests (16 tests)
+dotnet test --filter "FullyQualifiedName~CsvProcessingServiceTests|FullyQualifiedName~MockEmailServiceTests"
+
+# Run only integration tests (10 tests)
+dotnet test --filter "FullyQualifiedName~ApiClientIntegrationTests|FullyQualifiedName~StorageIntegrationTests"
+
+# Run only E2E test (1 test)
+dotnet test --filter "FullyQualifiedName~EndToEndEmailProcessingTests"
+
+# Run all tests except E2E (26 tests)
+dotnet test --filter "FullyQualifiedName!~EndToEndEmailProcessingTests"
+```
+
+#### Running Individual Test Classes
+
+```bash
+# CSV Processing Service tests
+dotnet test --filter "FullyQualifiedName~CsvProcessingServiceTests"
+
+# Mock Email Service tests
+dotnet test --filter "FullyQualifiedName~MockEmailServiceTests"
+
+# API Client Integration tests
+dotnet test --filter "FullyQualifiedName~ApiClientIntegrationTests"
+
+# Storage Integration tests
+dotnet test --filter "FullyQualifiedName~StorageIntegrationTests"
+
+# End-to-End Email Processing test
+dotnet test --filter "FullyQualifiedName~EndToEndEmailProcessingTests"
+```
+
+#### Test Configuration
+
+Tests use isolated configurations to prevent interference:
+
+- **Redis**: Each test uses a unique database prefix
+- **MinIO**: Each test uses isolated bucket paths
+- **Mock Services**: Test-specific instances with isolated data
+
+### Test Categories
+
+#### Unit Tests (16 tests)
+
+**CsvProcessingServiceTests** - Tests CSV validation and batch creation:
+- CSV format validation
+- Batch size calculations
+- Data type parsing
+- Error handling
+
+**MockEmailServiceTests** - Tests mock email service functionality:
+- Email seeding and retrieval
+- Processing state management
+- Test isolation
+- Reply email generation
+
+#### Integration Tests (10 tests)
+
+**ApiClientIntegrationTests** - Tests API client with mock responses:
+- Successful API calls
+- Error handling and retries
+- Parallel request handling
+- Custom response logic
+
+**StorageIntegrationTests** - Tests MinIO storage operations:
+- File upload and download
+- Stream handling
+- File deletion
+- Special character handling
+- Large file processing
+
+#### End-to-End Tests (1 test)
+
+**EndToEndEmailProcessingTests** - Tests complete workflow:
+- Email processing job execution
+- CSV file processing pipeline
+- API data transmission
+- Email reply generation
+
+### Test Data Isolation
+
+Each test runs in isolation using unique identifiers:
+
+- **Test IDs**: Generated from test method names
+- **Redis Keys**: Prefixed with test-specific identifiers
+- **MinIO Buckets**: Isolated per test execution
+- **Mock Data**: Clean state for each test
+
+### Debugging Tests
+
+#### Running Tests with Debug Output
+
+```bash
+# Run with detailed logging
+dotnet test --logger "console;verbosity=detailed"
+
+# Run specific test with debug output
+dotnet test --filter "TestMethodName" --logger "console;verbosity=detailed"
+```
+
+#### Viewing Test Results
+
+```bash
+# Generate test results file
+dotnet test --logger "trx;LogFileName=test-results.trx"
+
+# View results in Visual Studio or VS Code
+```
+
+### Continuous Integration
+
+Tests are automatically run in GitHub Actions with:
+
+- **Unit Tests**: Fast execution without external dependencies
+- **Integration Tests**: Full infrastructure setup with Redis and MinIO
+- **E2E Tests**: Complete workflow verification
+- **Artifact Collection**: Test results and coverage reports
+
+### Known Issues
+
+#### E2E Test Failures When Running All Tests
+
+**Issue**: The End-to-End test (`EndToEndEmailProcessingTests`) may fail when running the complete test suite (`dotnet test`) due to resource contention.
+
+**Root Cause**: 
+- Multiple Hangfire servers running simultaneously during parallel test execution
+- Shared Redis and MinIO instances being accessed by multiple test classes
+- Background job processing conflicts between different test contexts
+
+**Workarounds**:
+
+1. **Run E2E test separately** (Recommended):
+   ```bash
+   # Run all tests except E2E first
+   dotnet test --filter "FullyQualifiedName!~EndToEndEmailProcessingTests"
+   
+   # Then run E2E test separately
+   dotnet test --filter "FullyQualifiedName~EndToEndEmailProcessingTests"
+   ```
+
+2. **Run tests sequentially**:
+   ```bash
+   # Disable parallel execution
+   dotnet test --logger "console;verbosity=normal" -- --no-build
+   ```
+
+3. **Use GitHub Actions workflow** (Production approach):
+   - The CI/CD pipeline runs tests in separate jobs to avoid conflicts
+   - Unit/Integration tests run first, then E2E tests in isolation
+
+**Why This Happens**:
+- E2E tests require exclusive access to Hangfire job processing
+- Other integration tests may interfere with background job execution
+- Test isolation mechanisms work well for individual test classes but can conflict during full suite execution
+
+**Future Improvements**:
+- Consider implementing test ordering or dependency management
+- Explore containerized test isolation per test class
+- Investigate Hangfire test server isolation improvements
+
 ## Testing
 
 ### Using Mock Email Service
