@@ -77,14 +77,18 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release --verbosity minimal
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Start test infrastructure
       run: |
         echo "Starting Redis and MinIO services..."
-        docker-compose -f ./docker-compose.tests.yml up -d
+        # Use docker compose (newer syntax) instead of docker compose
+        docker compose -f ./docker-compose.tests.yml up -d
         
         echo "Waiting for services to be ready..."
         # Wait for Redis
-        timeout 30 bash -c 'until docker exec $(docker-compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
+        timeout 30 bash -c 'until docker exec $(docker compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
         
         # Wait for MinIO
         timeout 30 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
@@ -103,7 +107,7 @@ jobs:
     - name: Stop test infrastructure
       run: |
         echo "Stopping test infrastructure..."
-        docker-compose -f ./docker-compose.tests.yml down
+        docker compose -f ./docker-compose.tests.yml down
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -133,14 +137,17 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release --verbosity minimal
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Start fresh test infrastructure
       run: |
         echo "Starting Redis and MinIO services..."
-        docker-compose -f ./docker-compose.tests.yml up -d
+        docker compose -f ./docker-compose.tests.yml up -d
         
         echo "Waiting for services to be ready..."
         # Wait for Redis
-        timeout 30 bash -c 'until docker exec $(docker-compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
+        timeout 30 bash -c 'until docker exec $(docker compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
         
         # Wait for MinIO
         timeout 30 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
@@ -159,7 +166,7 @@ jobs:
     - name: Stop test infrastructure
       run: |
         echo "Stopping test infrastructure..."
-        docker-compose -f ./docker-compose.tests.yml down
+        docker compose -f ./docker-compose.tests.yml down
 
   test-results:
     runs-on: ubuntu-latest
