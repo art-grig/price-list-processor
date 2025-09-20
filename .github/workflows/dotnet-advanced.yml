@@ -78,17 +78,18 @@ jobs:
       run: dotnet build --no-restore --configuration Release --verbosity minimal
 
     - name: Start test infrastructure
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        services: ["redis", "minio"]
-        wait-for-tcp: ["6379", "9000"]
-        wait-for-tcp-timeout: "60s"
-
-    - name: Wait for services health checks
       run: |
-        echo "Waiting for services to be healthy..."
-        timeout 60 bash -c 'until docker-compose -f ./docker-compose.tests.yml ps | grep -q "healthy"; do sleep 2; done'
+        echo "Starting Redis and MinIO services..."
+        docker-compose -f ./docker-compose.tests.yml up -d
+        
+        echo "Waiting for services to be ready..."
+        # Wait for Redis
+        timeout 30 bash -c 'until docker exec $(docker-compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
+        
+        # Wait for MinIO
+        timeout 30 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+        
+        echo "Services are ready!"
 
     - name: Run integration tests (excluding E2E)
       run: |
@@ -100,10 +101,9 @@ jobs:
           --results-directory ./TestResults/Integration
 
     - name: Stop test infrastructure
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        action: down
+      run: |
+        echo "Stopping test infrastructure..."
+        docker-compose -f ./docker-compose.tests.yml down
 
   e2e-tests:
     runs-on: ubuntu-latest
@@ -134,17 +134,18 @@ jobs:
       run: dotnet build --no-restore --configuration Release --verbosity minimal
 
     - name: Start fresh test infrastructure
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        services: ["redis", "minio"]
-        wait-for-tcp: ["6379", "9000"]
-        wait-for-tcp-timeout: "60s"
-
-    - name: Wait for services health checks
       run: |
-        echo "Waiting for services to be healthy..."
-        timeout 60 bash -c 'until docker-compose -f ./docker-compose.tests.yml ps | grep -q "healthy"; do sleep 2; done'
+        echo "Starting Redis and MinIO services..."
+        docker-compose -f ./docker-compose.tests.yml up -d
+        
+        echo "Waiting for services to be ready..."
+        # Wait for Redis
+        timeout 30 bash -c 'until docker exec $(docker-compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
+        
+        # Wait for MinIO
+        timeout 30 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+        
+        echo "Services are ready!"
 
     - name: Run E2E test
       run: |
@@ -156,10 +157,9 @@ jobs:
           --results-directory ./TestResults/E2E
 
     - name: Stop test infrastructure
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        action: down
+      run: |
+        echo "Stopping test infrastructure..."
+        docker-compose -f ./docker-compose.tests.yml down
 
   test-results:
     runs-on: ubuntu-latest

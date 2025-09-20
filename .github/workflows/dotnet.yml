@@ -29,18 +29,18 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Start test infrastructure (Redis + MinIO)
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        services: ["redis", "minio"]
-        wait-for-tcp: ["6379", "9000"]
-        wait-for-tcp-timeout: "60s"
-
-    - name: Wait for services to be ready
       run: |
-        echo "Waiting for Redis and MinIO to be ready..."
-        sleep 10
-        echo "Services should be ready now"
+        echo "Starting Redis and MinIO services..."
+        docker-compose -f ./docker-compose.tests.yml up -d
+        
+        echo "Waiting for services to be ready..."
+        # Wait for Redis
+        timeout 30 bash -c 'until docker exec $(docker-compose -f ./docker-compose.tests.yml ps -q redis) redis-cli ping; do sleep 2; done'
+        
+        # Wait for MinIO
+        timeout 30 bash -c 'until curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+        
+        echo "Services are ready!"
 
     - name: Run unit and integration tests (26 tests)
       run: |
@@ -57,10 +57,9 @@ jobs:
           --logger "console;verbosity=normal"
 
     - name: Stop test infrastructure
-      uses: hoverkraft-tech/compose-action@v2.0.1
-      with:
-        compose-file: "./docker-compose.tests.yml"
-        action: down
+      run: |
+        echo "Stopping test infrastructure..."
+        docker-compose -f ./docker-compose.tests.yml down
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
